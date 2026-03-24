@@ -207,7 +207,7 @@ class ReplayStore:
             "cash": cash,
             "realized_pnl": realized_pnl,
             "unrealized_pnl": unrealized_pnl,
-            "net_pnl": cash + unrealized_pnl,
+            "net_pnl": realized_pnl + unrealized_pnl,
             "positions": positions_snapshot,
             "open_orders": sorted(open_orders),
         }

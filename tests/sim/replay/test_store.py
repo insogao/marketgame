@@ -115,3 +115,65 @@ def test_replay_store_computes_non_zero_pnl_from_recorded_fills() -> None:
     assert pnl["realized_pnl"] == 10.0
     assert pnl["net_pnl"] == 10.0
     assert pnl["cash"] == 10.0
+
+
+def test_replay_store_marks_open_long_position_to_market() -> None:
+    store = ReplayStore()
+    store.append_event(
+        "sim-1",
+        MarketEvent(
+            event_id="ack-buy",
+            simulation_id="sim-1",
+            event_type="ORDER_ACKED",
+            ts=1,
+            priority=EventPriority.PRIVATE_NOTIFICATION,
+            sequence_number=1,
+            payload={
+                "order_id": "ord-buy",
+                "actor_id": "trader-1",
+                "symbol": "FOO",
+                "side": "BUY",
+                "price": 100.0,
+                "qty": 1,
+            },
+        ),
+    )
+    store.append_event(
+        "sim-1",
+        MarketEvent(
+            event_id="fill-buy",
+            simulation_id="sim-1",
+            event_type="ORDER_FILLED",
+            ts=2,
+            priority=EventPriority.PRIVATE_NOTIFICATION,
+            sequence_number=2,
+            payload={
+                "order_id": "ord-buy",
+                "actor_id": "trader-1",
+                "symbol": "FOO",
+                "side": "BUY",
+                "price": 100.0,
+                "qty": 1,
+            },
+        ),
+    )
+    store.append_event(
+        "sim-1",
+        MarketEvent.quote(
+            simulation_id="sim-1",
+            symbol="FOO",
+            ts=3,
+            bid=109.0,
+            ask=111.0,
+            sequence_number=3,
+            event_id="quote-last",
+        ),
+    )
+
+    pnl = store.get_agent_pnl("sim-1", "trader-1")
+
+    assert pnl["cash"] == -100.0
+    assert pnl["realized_pnl"] == 0.0
+    assert pnl["unrealized_pnl"] == 10.0
+    assert pnl["net_pnl"] == 10.0
+    assert pnl["positions"] == {"FOO": 1}
