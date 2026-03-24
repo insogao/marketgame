@@ -44,7 +44,7 @@ class InMemoryMarketDataService:
         return [
             record.subscription_id
             for record in self._subscriptions.values()
-            if self._is_live_match(record.subscription, event)
+            if self._is_mode_match(record.subscription, event, "LIVE")
         ]
 
     def get_trades(
@@ -113,18 +113,31 @@ class InMemoryMarketDataService:
                 continue
             if self._channel_for_event(event) not in allowed_channels:
                 continue
-            if not self._has_matching_live_subscription(event):
+            if not self._has_matching_subscription(event, "LIVE"):
                 continue
             yield event
 
-    def _has_matching_live_subscription(self, event: MarketEvent) -> bool:
+    def stream_replay(
+        self, simulation_id: str, symbol: str, channels: list[str]
+    ) -> Iterable[MarketEvent]:
+        allowed_channels = set(channels)
+        for event in self._replay_store.replay(simulation_id):
+            if event.payload.get("symbol") != symbol:
+                continue
+            if self._channel_for_event(event) not in allowed_channels:
+                continue
+            if not self._has_matching_subscription(event, "REPLAY"):
+                continue
+            yield event
+
+    def _has_matching_subscription(self, event: MarketEvent, mode: str) -> bool:
         for record in self._subscriptions.values():
-            if self._is_live_match(record.subscription, event):
+            if self._is_mode_match(record.subscription, event, mode):
                 return True
         return False
 
-    def _is_live_match(self, subscription: EventSubscription, event: MarketEvent) -> bool:
-        if subscription.mode != "LIVE":
+    def _is_mode_match(self, subscription: EventSubscription, event: MarketEvent, mode: str) -> bool:
+        if subscription.mode != mode:
             return False
         return self._matches_subscription(subscription, event)
 
@@ -138,11 +151,10 @@ class InMemoryMarketDataService:
         if subscription.actor_scope == "PRIVATE" and event.priority != EventPriority.PRIVATE_NOTIFICATION:
             return False
         channel = self._channel_for_event(event)
-        if subscription.channels or subscription.event_types:
-            channel_matches = not subscription.channels or channel in subscription.channels
-            event_type_matches = not subscription.event_types or event.event_type in subscription.event_types
-            if not (channel_matches or event_type_matches):
-                return False
+        if subscription.channels and channel not in subscription.channels:
+            return False
+        if subscription.event_types and event.event_type not in subscription.event_types:
+            return False
         return True
 
     @staticmethod

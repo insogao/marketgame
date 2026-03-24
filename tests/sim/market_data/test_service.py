@@ -81,6 +81,17 @@ def test_market_data_service_reads_trades_quotes_and_bars() -> None:
 def test_market_data_service_filters_by_mode_channel_and_scope() -> None:
     service = InMemoryMarketDataService(replay_store=ReplayStore())
 
+    mismatched_subscription_id = service.subscribe(
+        EventSubscription(
+            simulation_id="sim-1",
+            subscriber_id="viewer-mismatch",
+            mode="LIVE",
+            channels=("quotes",),
+            event_types=("TRADE_PRINT",),
+            symbols=("FOO",),
+            actor_scope="PUBLIC",
+        )
+    )
     public_subscription_id = service.subscribe(
         EventSubscription(
             simulation_id="sim-1",
@@ -119,7 +130,7 @@ def test_market_data_service_filters_by_mode_channel_and_scope() -> None:
             simulation_id="sim-1",
             subscriber_id="agent-private",
             mode="LIVE",
-            channels=("quotes",),
+            channels=("private",),
             event_types=("ORDER_FILLED",),
             symbols=("FOO",),
             actor_scope="PRIVATE",
@@ -156,6 +167,7 @@ def test_market_data_service_filters_by_mode_channel_and_scope() -> None:
     private_notifications = service.publish_event(private_event)
     wrong_symbol_notifications = service.publish_event(wrong_symbol_event)
 
+    assert mismatched_subscription_id not in public_notifications
     assert public_subscription_id in public_notifications
     assert public_trade_subscription_id not in public_notifications
     assert replay_subscription_id not in public_notifications
@@ -163,3 +175,49 @@ def test_market_data_service_filters_by_mode_channel_and_scope() -> None:
     assert private_subscription_id in private_notifications
     assert public_subscription_id not in private_notifications
     assert wrong_symbol_notifications == []
+
+
+def test_replay_subscription_receives_recorded_events_through_service_api() -> None:
+    store = ReplayStore()
+    service = InMemoryMarketDataService(replay_store=store)
+
+    replay_subscription_id = service.subscribe(
+        EventSubscription(
+            simulation_id="sim-1",
+            subscriber_id="viewer-replay",
+            mode="REPLAY",
+            channels=("trades",),
+            event_types=("TRADE_PRINT",),
+            symbols=("FOO",),
+            actor_scope="PUBLIC",
+        )
+    )
+
+    store.append_event(
+        "sim-1",
+        MarketEvent.trade_print(
+            simulation_id="sim-1",
+            symbol="FOO",
+            ts=1,
+            price=101.0,
+            qty=2,
+            sequence_number=1,
+            event_id="trade-1",
+        ),
+    )
+
+    replay_events = list(service.stream_replay("sim-1", "FOO", ["trades"]))
+    live_notifications = service.publish_event(
+        MarketEvent.trade_print(
+            simulation_id="sim-1",
+            symbol="FOO",
+            ts=2,
+            price=102.0,
+            qty=1,
+            sequence_number=2,
+            event_id="trade-2",
+        )
+    )
+
+    assert replay_subscription_id not in live_notifications
+    assert [event.event_id for event in replay_events] == ["trade-1"]
