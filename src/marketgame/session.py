@@ -7,7 +7,7 @@ def run_seeded_session(seed: int, symbol: str, steps: int) -> dict[str, object]:
     runner = SeededSimulationRunner(
         seed=seed,
         symbol=symbol,
-        duration_seconds=10**9,
+        duration_seconds=max(steps * 10, 300),
         max_events=steps,
     )
     runner.start()

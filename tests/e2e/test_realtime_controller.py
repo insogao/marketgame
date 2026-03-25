@@ -80,6 +80,7 @@ def test_realtime_controller_uses_finer_default_chart_interval() -> None:
         seed=7,
         symbol="FOO",
         duration_seconds=250,
+        bar_interval="10s",
         base_delay_seconds=0.0,
     )
     controller.start()
@@ -98,6 +99,7 @@ def test_realtime_controller_completes_when_duration_horizon_is_reached() -> Non
         seed=7,
         symbol="FOO",
         duration_seconds=20,
+        bar_interval="10s",
         base_delay_seconds=0.0,
     )
     controller.start()
@@ -110,3 +112,23 @@ def test_realtime_controller_completes_when_duration_horizon_is_reached() -> Non
     assert snapshot["status"] == "completed"
     assert snapshot["last_event_ts"] <= 20
     assert snapshot["duration_seconds"] == 20
+
+
+def test_realtime_controller_snapshot_expands_whitespace_slots_to_duration() -> None:
+    controller = RealtimeSimulationController(
+        seed=7,
+        symbol="FOO",
+        duration_seconds=300,
+        bar_interval="10s",
+        base_delay_seconds=0.0,
+    )
+    controller.start()
+
+    while controller.status == "running":
+        controller.advance_one()
+
+    snapshot = controller.snapshot()
+
+    assert snapshot["bar_interval"] == "10s"
+    assert len(snapshot["bars"]) == 30
+    assert any(bar["is_whitespace"] for bar in snapshot["bars"])

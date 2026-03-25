@@ -40,6 +40,7 @@ function cacheElements() {
     "duration-input",
     "speed-select",
     "color-mode-select",
+    "bar-interval-select",
     "chart-symbol",
     "chart-legend",
     "last-trade-price",
@@ -69,6 +70,7 @@ function bindEvents() {
           seed: Number(els["seed-input"].value || 7),
           symbol: normalizeSymbol(els["symbol-input"].value),
           duration_seconds: Number(els["duration-input"].value || 300),
+          bar_interval: String(els["bar-interval-select"].value || "10s"),
         });
       } else if (action === "pause") {
         runCommand("/api/session/pause");
@@ -226,6 +228,7 @@ function renderHeader(snapshot) {
   els["chart-symbol"].textContent = snapshot.symbol || "FOO";
   els["chart-legend"].textContent = `${state.barInterval} candles with volume below`;
   els["duration-input"].value = String(snapshot.duration_seconds || 300);
+  els["bar-interval-select"].value = state.barInterval;
   els["bar-count"].textContent = String(Array.isArray(snapshot.bars) ? snapshot.bars.length : 0);
   els["event-count"].textContent = `${Number(snapshot.processed_events || 0)} events processed`;
   els["speed-select"].value = String(snapshot.speed || 1);
@@ -287,20 +290,54 @@ function renderBars(bars) {
   if (!state.candleSeries || !state.volumeSeries) {
     return;
   }
-  const mapped = bars.map((bar) => ({
-    time: normalizeChartTime(bar.end_ts ?? bar.ts ?? bar.time),
-    open: Number(bar.open),
-    high: Number(bar.high),
-    low: Number(bar.low),
-    close: Number(bar.close),
-  }));
-  state.candleSeries.setData(mapped);
-  const volumeData = bars.map((bar) => ({
-    time: normalizeChartTime(bar.end_ts ?? bar.ts ?? bar.time),
-    value: Number(bar.volume || 0),
-    color: Number(bar.close) >= Number(bar.open) ? currentPalette().upVolume : currentPalette().downVolume,
-  }));
+  let previousClose = null;
+  const candleData = [];
+  const volumeData = [];
+
+  for (const bar of bars) {
+    const time = normalizeChartTime(bar.end_ts ?? bar.ts ?? bar.time);
+    if (bar.is_whitespace || bar.open == null) {
+      candleData.push({ time });
+      volumeData.push({ time, value: 0, color: "rgba(0,0,0,0)" });
+      continue;
+    }
+
+    let open = Number(bar.open);
+    let high = Number(bar.high);
+    let low = Number(bar.low);
+    const close = Number(bar.close);
+
+    if (
+      previousClose != null
+      && approximatelyEqual(open, close)
+      && approximatelyEqual(high, low)
+      && !approximatelyEqual(previousClose, close)
+    ) {
+      open = previousClose;
+      high = Math.max(high, previousClose, close);
+      low = Math.min(low, previousClose, close);
+    }
+
+    candleData.push({
+      time,
+      open,
+      high,
+      low,
+      close,
+    });
+
+    volumeData.push({
+      time,
+      value: Number(bar.volume || 0),
+      color: close >= open ? currentPalette().upVolume : currentPalette().downVolume,
+    });
+
+    previousClose = close;
+  }
+
+  state.candleSeries.setData(candleData);
   state.volumeSeries.setData(volumeData);
+  state.chart.timeScale().fitContent();
 }
 
 function initChart() {
@@ -337,6 +374,13 @@ function initChart() {
   const candleSeries = chart.addCandlestickSeries({
     priceLineVisible: false,
     lastValueVisible: false,
+    borderVisible: false,
+  });
+  candleSeries.priceScale().applyOptions({
+    scaleMargins: {
+      top: 0.08,
+      bottom: 0.32,
+    },
   });
 
   const volumeSeries = chart.addHistogramSeries({
@@ -351,7 +395,7 @@ function initChart() {
   });
   volumeSeries.priceScale().applyOptions({
     scaleMargins: {
-      top: 0.72,
+      top: 0.78,
       bottom: 0,
     },
   });
@@ -580,6 +624,10 @@ function normalizeChartTime(value) {
   return CHART_EPOCH + normalizeTime(value);
 }
 
+function approximatelyEqual(a, b) {
+  return Math.abs(Number(a) - Number(b)) < 1e-9;
+}
+
 function intervalToSeconds(interval) {
   const value = String(interval || "10s");
   if (value.endsWith("s")) {
@@ -625,6 +673,7 @@ function applyColorScheme() {
     wickDownColor: palette.down,
     priceLineVisible: false,
     lastValueVisible: false,
+    borderVisible: false,
   });
   state.volumeSeries.applyOptions({
     priceLineVisible: false,

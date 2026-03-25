@@ -11,16 +11,19 @@ class RealtimeSimulationController:
         seed: int,
         symbol: str,
         duration_seconds: int,
+        bar_interval: str = "10s",
         base_delay_seconds: float = 0.05,
     ) -> None:
         self._seed = seed
         self._symbol = symbol
         self._duration_seconds = duration_seconds
+        self._bar_interval = bar_interval
         self._base_delay_seconds = base_delay_seconds
         self._runner = SeededSimulationRunner(
             seed=seed,
             symbol=symbol,
             duration_seconds=duration_seconds,
+            bar_interval=bar_interval,
         )
 
     def start(self) -> None:
@@ -37,6 +40,7 @@ class RealtimeSimulationController:
             seed=self._seed,
             symbol=self._symbol,
             duration_seconds=self._duration_seconds,
+            bar_interval=self._bar_interval,
         )
 
     def set_speed(self, speed: float) -> None:

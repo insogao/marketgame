@@ -14,6 +14,8 @@ def test_app_serves_dashboard_and_session_state() -> None:
     assert "Duration" in dashboard.text
     assert "CN" in dashboard.text
     assert "INTL" in dashboard.text
+    assert "1s" in dashboard.text
+    assert "5m" in dashboard.text
     assert '/web/styles.css' in dashboard.text
     assert '/web/app.js' in dashboard.text
 
@@ -37,6 +39,7 @@ def test_app_control_routes_update_session_state() -> None:
     assert started.status_code == 200
     assert started.json()["status"] == "running"
     assert started.json()["duration_seconds"] == 20
+    assert started.json()["bar_interval"] == "10s"
 
     paused = client.post("/api/session/pause")
     assert paused.status_code == 200

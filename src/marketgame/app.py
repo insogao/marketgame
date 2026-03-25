@@ -17,6 +17,7 @@ class SessionStartRequest(BaseModel):
     seed: int = Field(7, ge=0)
     symbol: str = Field("FOO", min_length=1)
     duration_seconds: int = Field(300, ge=1)
+    bar_interval: str = Field("10s", min_length=1)
 
 
 class SessionSpeedRequest(BaseModel):
@@ -49,7 +50,12 @@ def create_app() -> FastAPI:
         await _cancel_playback_task(app.state.playback_task)
 
     app = FastAPI(lifespan=lifespan)
-    app.state.controller = RealtimeSimulationController(seed=7, symbol="FOO", duration_seconds=300)
+    app.state.controller = RealtimeSimulationController(
+        seed=7,
+        symbol="FOO",
+        duration_seconds=300,
+        bar_interval="10s",
+    )
     app.state.hub = ConnectionHub()
     app.state.playback_task = None
     if web_dir.exists():
@@ -71,6 +77,7 @@ def create_app() -> FastAPI:
             seed=request.seed,
             symbol=request.symbol,
             duration_seconds=request.duration_seconds,
+            bar_interval=request.bar_interval,
         )
         app.state.controller.start()
         await _ensure_playback_task(app)

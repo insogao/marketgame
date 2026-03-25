@@ -4,6 +4,7 @@ from dataclasses import asdict
 
 from marketgame.api.market import MarketAPI
 from marketgame.sim.agents.runtime import AgentRuntime
+from marketgame.sim.market_data.bars import _interval_to_seconds
 from marketgame.sim.contracts import CancelOrderRequest, EventSubscription, SubmitOrderRequest
 from marketgame.sim.events import MarketEvent
 from marketgame.sim.exchange.engine import ExchangeEngine
@@ -35,11 +36,13 @@ class SeededSimulationRunner:
         symbol: str,
         duration_seconds: int | None = None,
         max_events: int | None = None,
+        bar_interval: str = DEFAULT_BAR_INTERVAL,
     ) -> None:
         self.seed = seed
         self.symbol = symbol
         self.duration_seconds = 300 if duration_seconds is None else duration_seconds
         self.max_events = max_events
+        self.bar_interval = bar_interval
         self.session_id = f"sim-{seed}"
         self.status = "idle"
         self.speed = 1.0
@@ -76,6 +79,7 @@ class SeededSimulationRunner:
             symbol=self.symbol,
             duration_seconds=self.duration_seconds,
             max_events=self.max_events,
+            bar_interval=self.bar_interval,
         )
 
     def set_speed(self, speed: float) -> None:
@@ -115,7 +119,13 @@ class SeededSimulationRunner:
         return [event]
 
     def snapshot(self) -> dict[str, object]:
-        bar_interval = DEFAULT_BAR_INTERVAL
+        bar_interval = self.bar_interval
+        dense_bars = []
+        if self.processed_events > 0 or self.status != "idle":
+            dense_bars = self._dense_bars(
+                self._market_api.get_bars(self.session_id, self.symbol, bar_interval, 0, 10**9),
+                bar_interval,
+            )
         return {
             "session_id": self.session_id,
             "symbol": self.symbol,
@@ -128,7 +138,7 @@ class SeededSimulationRunner:
             "trades": self._serialize_recent_trades(),
             "latest_trade": self._serialize_optional_trade(),
             "quote": self._serialize_optional_quote(),
-            "bars": [asdict(bar) for bar in self._market_api.get_bars(self.session_id, self.symbol, bar_interval, 0, 10**9)],
+            "bars": dense_bars,
             "agent_accounts": {
                 agent_id: self._exchange.get_account_snapshot(self.session_id, agent_id)
                 for agent_id in self._agents
@@ -255,3 +265,33 @@ class SeededSimulationRunner:
         if quote is None:
             return None
         return asdict(quote)
+
+    def _dense_bars(self, bars: list[object], interval: str) -> list[dict[str, object]]:
+        interval_seconds = _interval_to_seconds(interval)
+        bar_by_end = {int(bar.end_ts): bar for bar in bars}
+        dense: list[dict[str, object]] = []
+
+        for bucket_end in range(interval_seconds, self.duration_seconds + 1, interval_seconds):
+            bucket_start = bucket_end - interval_seconds
+            bar = bar_by_end.get(bucket_end)
+            if bar is None:
+                dense.append(
+                    {
+                        "simulation_id": self.session_id,
+                        "symbol": self.symbol,
+                        "interval": interval,
+                        "open": None,
+                        "high": None,
+                        "low": None,
+                        "close": None,
+                        "volume": 0,
+                        "start_ts": bucket_start,
+                        "end_ts": bucket_end,
+                        "is_whitespace": True,
+                    }
+                )
+                continue
+            row = asdict(bar)
+            row["is_whitespace"] = False
+            dense.append(row)
+        return dense
