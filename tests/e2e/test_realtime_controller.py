@@ -5,7 +5,7 @@ def test_realtime_controller_start_pause_resume_and_reset() -> None:
     controller = RealtimeSimulationController(
         seed=7,
         symbol="FOO",
-        steps=20,
+        duration_seconds=20,
         base_delay_seconds=0.0,
     )
 
@@ -43,7 +43,7 @@ def test_realtime_controller_scales_wall_clock_delay_by_speed() -> None:
     controller = RealtimeSimulationController(
         seed=7,
         symbol="FOO",
-        steps=20,
+        duration_seconds=20,
         base_delay_seconds=0.2,
     )
 
@@ -60,7 +60,7 @@ def test_realtime_controller_snapshot_includes_recent_trades() -> None:
     controller = RealtimeSimulationController(
         seed=7,
         symbol="FOO",
-        steps=80,
+        duration_seconds=80,
         base_delay_seconds=0.0,
     )
     controller.start()
@@ -79,7 +79,7 @@ def test_realtime_controller_uses_finer_default_chart_interval() -> None:
     controller = RealtimeSimulationController(
         seed=7,
         symbol="FOO",
-        steps=250,
+        duration_seconds=250,
         base_delay_seconds=0.0,
     )
     controller.start()
@@ -91,3 +91,22 @@ def test_realtime_controller_uses_finer_default_chart_interval() -> None:
 
     assert snapshot["bar_interval"] == "10s"
     assert len(snapshot["bars"]) > 2
+
+
+def test_realtime_controller_completes_when_duration_horizon_is_reached() -> None:
+    controller = RealtimeSimulationController(
+        seed=7,
+        symbol="FOO",
+        duration_seconds=20,
+        base_delay_seconds=0.0,
+    )
+    controller.start()
+
+    while controller.status == "running":
+        controller.advance_one()
+
+    snapshot = controller.snapshot()
+
+    assert snapshot["status"] == "completed"
+    assert snapshot["last_event_ts"] <= 20
+    assert snapshot["duration_seconds"] == 20

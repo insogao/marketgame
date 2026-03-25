@@ -10,14 +10,18 @@ class RealtimeSimulationController:
         *,
         seed: int,
         symbol: str,
-        steps: int,
+        duration_seconds: int,
         base_delay_seconds: float = 0.05,
     ) -> None:
         self._seed = seed
         self._symbol = symbol
-        self._steps = steps
+        self._duration_seconds = duration_seconds
         self._base_delay_seconds = base_delay_seconds
-        self._runner = SeededSimulationRunner(seed=seed, symbol=symbol, steps=steps)
+        self._runner = SeededSimulationRunner(
+            seed=seed,
+            symbol=symbol,
+            duration_seconds=duration_seconds,
+        )
 
     def start(self) -> None:
         self._runner.start()
@@ -29,7 +33,11 @@ class RealtimeSimulationController:
         self._runner.resume()
 
     def reset(self) -> None:
-        self._runner = SeededSimulationRunner(seed=self._seed, symbol=self._symbol, steps=self._steps)
+        self._runner = SeededSimulationRunner(
+            seed=self._seed,
+            symbol=self._symbol,
+            duration_seconds=self._duration_seconds,
+        )
 
     def set_speed(self, speed: float) -> None:
         self._runner.set_speed(speed)

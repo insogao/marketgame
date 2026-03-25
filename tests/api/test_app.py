@@ -11,6 +11,9 @@ def test_app_serves_dashboard_and_session_state() -> None:
     dashboard = client.get("/")
     assert dashboard.status_code == 200
     assert "Market Game" in dashboard.text
+    assert "Duration" in dashboard.text
+    assert "CN" in dashboard.text
+    assert "INTL" in dashboard.text
     assert '/web/styles.css' in dashboard.text
     assert '/web/app.js' in dashboard.text
 
@@ -30,9 +33,10 @@ def test_app_serves_dashboard_and_session_state() -> None:
 def test_app_control_routes_update_session_state() -> None:
     client = TestClient(create_app())
 
-    started = client.post("/api/session/start", json={"seed": 7, "symbol": "FOO", "steps": 20})
+    started = client.post("/api/session/start", json={"seed": 7, "symbol": "FOO", "duration_seconds": 20})
     assert started.status_code == 200
     assert started.json()["status"] == "running"
+    assert started.json()["duration_seconds"] == 20
 
     paused = client.post("/api/session/pause")
     assert paused.status_code == 200
@@ -68,7 +72,7 @@ def test_websocket_streams_incremental_event_objects_after_start() -> None:
         first = websocket.receive_json()
         assert first["type"] == "snapshot"
 
-        started = client.post("/api/session/start", json={"seed": 7, "symbol": "FOO", "steps": 5})
+        started = client.post("/api/session/start", json={"seed": 7, "symbol": "FOO", "duration_seconds": 5})
         assert started.status_code == 200
 
         event_message = None

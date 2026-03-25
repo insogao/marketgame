@@ -6,6 +6,7 @@ const state = {
   candleSeries: null,
   volumeSeries: null,
   barInterval: "10s",
+  colorMode: "cn",
   bars: [],
   trades: [],
   latestTrade: null,
@@ -36,8 +37,9 @@ function cacheElements() {
     "connection-state",
     "seed-input",
     "symbol-input",
-    "steps-input",
+    "duration-input",
     "speed-select",
+    "color-mode-select",
     "chart-symbol",
     "chart-legend",
     "last-trade-price",
@@ -66,7 +68,7 @@ function bindEvents() {
         runCommand("/api/session/start", {
           seed: Number(els["seed-input"].value || 7),
           symbol: normalizeSymbol(els["symbol-input"].value),
-          steps: Number(els["steps-input"].value || 250),
+          duration_seconds: Number(els["duration-input"].value || 300),
         });
       } else if (action === "pause") {
         runCommand("/api/session/pause");
@@ -80,6 +82,12 @@ function bindEvents() {
 
   els["speed-select"].addEventListener("change", () => {
     runCommand("/api/session/speed", { speed: Number(els["speed-select"].value) });
+  });
+
+  els["color-mode-select"].addEventListener("change", () => {
+    state.colorMode = String(els["color-mode-select"].value || "cn");
+    applyColorScheme();
+    renderBars(state.bars);
   });
 }
 
@@ -217,6 +225,7 @@ function renderHeader(snapshot) {
   els["transport-readout"].textContent = `${Number(snapshot.processed_events || 0)} events processed`;
   els["chart-symbol"].textContent = snapshot.symbol || "FOO";
   els["chart-legend"].textContent = `${state.barInterval} candles with volume below`;
+  els["duration-input"].value = String(snapshot.duration_seconds || 300);
   els["bar-count"].textContent = String(Array.isArray(snapshot.bars) ? snapshot.bars.length : 0);
   els["event-count"].textContent = `${Number(snapshot.processed_events || 0)} events processed`;
   els["speed-select"].value = String(snapshot.speed || 1);
@@ -289,7 +298,7 @@ function renderBars(bars) {
   const volumeData = bars.map((bar) => ({
     time: normalizeChartTime(bar.end_ts ?? bar.ts ?? bar.time),
     value: Number(bar.volume || 0),
-    color: Number(bar.close) >= Number(bar.open) ? "rgba(114, 240, 163, 0.65)" : "rgba(255, 122, 144, 0.65)",
+    color: Number(bar.close) >= Number(bar.open) ? currentPalette().upVolume : currentPalette().downVolume,
   }));
   state.volumeSeries.setData(volumeData);
 }
@@ -326,12 +335,8 @@ function initChart() {
   });
 
   const candleSeries = chart.addCandlestickSeries({
-    upColor: "#72f0a3",
-    downColor: "#ff7a90",
-    borderUpColor: "#72f0a3",
-    borderDownColor: "#ff7a90",
-    wickUpColor: "#72f0a3",
-    wickDownColor: "#ff7a90",
+    priceLineVisible: false,
+    lastValueVisible: false,
   });
 
   const volumeSeries = chart.addHistogramSeries({
@@ -339,12 +344,14 @@ function initChart() {
     priceFormat: {
       type: "volume",
     },
+    priceLineVisible: false,
+    lastValueVisible: false,
     color: "#76d0ff",
     base: 0,
   });
   volumeSeries.priceScale().applyOptions({
     scaleMargins: {
-      top: 0.78,
+      top: 0.72,
       bottom: 0,
     },
   });
@@ -354,6 +361,7 @@ function initChart() {
   state.chart = chart;
   state.candleSeries = candleSeries;
   state.volumeSeries = volumeSeries;
+  applyColorScheme();
 
   window.addEventListener("resize", () => {
     chart.applyOptions({
@@ -584,6 +592,44 @@ function intervalToSeconds(interval) {
     return (Number(value.slice(0, -1)) || 1) * 3600;
   }
   return Number(value) || 10;
+}
+
+function currentPalette() {
+  if (state.colorMode === "intl") {
+    return {
+      up: "#72f0a3",
+      down: "#ff6b6b",
+      upVolume: "rgba(114, 240, 163, 0.72)",
+      downVolume: "rgba(255, 107, 107, 0.72)",
+    };
+  }
+  return {
+    up: "#ff5b7f",
+    down: "#3ddc97",
+    upVolume: "rgba(255, 91, 127, 0.72)",
+    downVolume: "rgba(61, 220, 151, 0.72)",
+  };
+}
+
+function applyColorScheme() {
+  if (!state.candleSeries || !state.volumeSeries) {
+    return;
+  }
+  const palette = currentPalette();
+  state.candleSeries.applyOptions({
+    upColor: palette.up,
+    downColor: palette.down,
+    borderUpColor: palette.up,
+    borderDownColor: palette.down,
+    wickUpColor: palette.up,
+    wickDownColor: palette.down,
+    priceLineVisible: false,
+    lastValueVisible: false,
+  });
+  state.volumeSeries.applyOptions({
+    priceLineVisible: false,
+    lastValueVisible: false,
+  });
 }
 
 function renderPositions(positions) {

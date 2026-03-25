@@ -28,10 +28,18 @@ def _serialize_event(event: MarketEvent) -> dict[str, object]:
 
 
 class SeededSimulationRunner:
-    def __init__(self, *, seed: int, symbol: str, steps: int) -> None:
+    def __init__(
+        self,
+        *,
+        seed: int,
+        symbol: str,
+        duration_seconds: int | None = None,
+        max_events: int | None = None,
+    ) -> None:
         self.seed = seed
         self.symbol = symbol
-        self.steps = steps
+        self.duration_seconds = 300 if duration_seconds is None else duration_seconds
+        self.max_events = max_events
         self.session_id = f"sim-{seed}"
         self.status = "idle"
         self.speed = 1.0
@@ -63,7 +71,12 @@ class SeededSimulationRunner:
             self.status = "running"
 
     def reset(self) -> None:
-        self.__init__(seed=self.seed, symbol=self.symbol, steps=self.steps)
+        self.__init__(
+            seed=self.seed,
+            symbol=self.symbol,
+            duration_seconds=self.duration_seconds,
+            max_events=self.max_events,
+        )
 
     def set_speed(self, speed: float) -> None:
         if speed <= 0:
@@ -76,11 +89,14 @@ class SeededSimulationRunner:
     def advance_one(self) -> list[MarketEvent]:
         if self.status != "running":
             return []
-        if self.processed_events >= self.steps:
+        if self.max_events is not None and self.processed_events >= self.max_events:
             self.status = "completed"
             return []
         event = self._kernel.next_event()
         if event is None:
+            self.status = "completed"
+            return []
+        if event.ts > self.duration_seconds:
             self.status = "completed"
             return []
 
@@ -90,7 +106,10 @@ class SeededSimulationRunner:
         self._market_data.publish_event(event)
         self._handle_event(event)
 
-        if self.processed_events >= self.steps or not self._kernel.has_events():
+        if (
+            (self.max_events is not None and self.processed_events >= self.max_events)
+            or not self._kernel.has_events()
+        ):
             self.status = "completed"
 
         return [event]
@@ -103,6 +122,7 @@ class SeededSimulationRunner:
             "seed": self.seed,
             "status": self.status,
             "speed": self.speed,
+            "duration_seconds": self.duration_seconds,
             "processed_events": self.processed_events,
             "bar_interval": bar_interval,
             "trades": self._serialize_recent_trades(),

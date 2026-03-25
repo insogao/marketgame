@@ -4,7 +4,12 @@ from marketgame.sim.live_session import SeededSimulationRunner
 
 
 def run_seeded_session(seed: int, symbol: str, steps: int) -> dict[str, object]:
-    runner = SeededSimulationRunner(seed=seed, symbol=symbol, steps=steps)
+    runner = SeededSimulationRunner(
+        seed=seed,
+        symbol=symbol,
+        duration_seconds=10**9,
+        max_events=steps,
+    )
     runner.start()
     while runner.status == "running":
         runner.advance_one()
