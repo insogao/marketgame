@@ -73,3 +73,21 @@ def test_realtime_controller_snapshot_includes_recent_trades() -> None:
 
     assert snapshot["trades"]
     assert snapshot["latest_trade"] is not None
+
+
+def test_realtime_controller_uses_finer_default_chart_interval() -> None:
+    controller = RealtimeSimulationController(
+        seed=7,
+        symbol="FOO",
+        steps=250,
+        base_delay_seconds=0.0,
+    )
+    controller.start()
+
+    while controller.status == "running":
+        controller.advance_one()
+
+    snapshot = controller.snapshot()
+
+    assert snapshot["bar_interval"] == "10s"
+    assert len(snapshot["bars"]) > 2

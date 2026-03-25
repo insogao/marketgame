@@ -5,6 +5,7 @@ const state = {
   chart: null,
   candleSeries: null,
   volumeSeries: null,
+  barInterval: "10s",
   bars: [],
   trades: [],
   latestTrade: null,
@@ -38,6 +39,7 @@ function cacheElements() {
     "steps-input",
     "speed-select",
     "chart-symbol",
+    "chart-legend",
     "last-trade-price",
     "last-trade-meta",
     "best-bid",
@@ -144,6 +146,7 @@ function applySnapshot(snapshot) {
   }
 
   state.session = snapshot;
+  state.barInterval = snapshot.bar_interval || state.barInterval;
   state.bars = Array.isArray(snapshot.bars) ? snapshot.bars.slice() : state.bars;
   state.trades = getTradesFromSnapshot(snapshot);
   state.latestTrade = snapshot.latest_trade || state.latestTrade;
@@ -213,6 +216,7 @@ function renderHeader(snapshot) {
   els["speed-readout"].textContent = `${Number(snapshot.speed || 1).toFixed(1)}x`;
   els["transport-readout"].textContent = `${Number(snapshot.processed_events || 0)} events processed`;
   els["chart-symbol"].textContent = snapshot.symbol || "FOO";
+  els["chart-legend"].textContent = `${state.barInterval} candles with volume below`;
   els["bar-count"].textContent = String(Array.isArray(snapshot.bars) ? snapshot.bars.length : 0);
   els["event-count"].textContent = `${Number(snapshot.processed_events || 0)} events processed`;
   els["speed-select"].value = String(snapshot.speed || 1);
@@ -364,7 +368,10 @@ function upsertBarFromTrade(bars, trade) {
     return bars;
   }
 
-  const time = normalizeChartTime(trade.ts);
+  const intervalSeconds = intervalToSeconds(state.barInterval);
+  const bucketStart = Math.floor(Number(trade.ts) / intervalSeconds) * intervalSeconds;
+  const bucketEnd = bucketStart + intervalSeconds;
+  const time = normalizeChartTime(bucketEnd);
   const price = Number(trade.price);
   const qty = Number(trade.qty || 0);
   const last = bars[bars.length - 1];
@@ -373,8 +380,8 @@ function upsertBarFromTrade(bars, trade) {
     return [
       {
         time,
-        start_ts: trade.ts,
-        end_ts: trade.ts,
+        start_ts: bucketStart,
+        end_ts: bucketEnd,
         open: price,
         high: price,
         low: price,
@@ -404,8 +411,8 @@ function upsertBarFromTrade(bars, trade) {
     ...bars,
     {
       time,
-      start_ts: trade.ts,
-      end_ts: trade.ts,
+      start_ts: bucketStart,
+      end_ts: bucketEnd,
       open: price,
       high: price,
       low: price,
@@ -563,6 +570,20 @@ function normalizeTime(value) {
 
 function normalizeChartTime(value) {
   return CHART_EPOCH + normalizeTime(value);
+}
+
+function intervalToSeconds(interval) {
+  const value = String(interval || "10s");
+  if (value.endsWith("s")) {
+    return Number(value.slice(0, -1)) || 10;
+  }
+  if (value.endsWith("m")) {
+    return (Number(value.slice(0, -1)) || 1) * 60;
+  }
+  if (value.endsWith("h")) {
+    return (Number(value.slice(0, -1)) || 1) * 3600;
+  }
+  return Number(value) || 10;
 }
 
 function renderPositions(positions) {

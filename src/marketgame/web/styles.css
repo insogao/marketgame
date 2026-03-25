@@ -83,6 +83,12 @@ body::before {
   color: var(--accent);
 }
 
+.panel__subtle {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
 h1,
 h2,
 p {

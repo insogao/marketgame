@@ -12,6 +12,8 @@ from marketgame.sim.market_data.service import InMemoryMarketDataService
 from marketgame.sim.population import build_seeded_population
 from marketgame.sim.replay.store import ReplayStore
 
+DEFAULT_BAR_INTERVAL = "10s"
+
 
 def _serialize_event(event: MarketEvent) -> dict[str, object]:
     return {
@@ -94,6 +96,7 @@ class SeededSimulationRunner:
         return [event]
 
     def snapshot(self) -> dict[str, object]:
+        bar_interval = DEFAULT_BAR_INTERVAL
         return {
             "session_id": self.session_id,
             "symbol": self.symbol,
@@ -101,10 +104,11 @@ class SeededSimulationRunner:
             "status": self.status,
             "speed": self.speed,
             "processed_events": self.processed_events,
+            "bar_interval": bar_interval,
             "trades": self._serialize_recent_trades(),
             "latest_trade": self._serialize_optional_trade(),
             "quote": self._serialize_optional_quote(),
-            "bars": [asdict(bar) for bar in self._market_api.get_bars(self.session_id, self.symbol, "1m", 0, 10**9)],
+            "bars": [asdict(bar) for bar in self._market_api.get_bars(self.session_id, self.symbol, bar_interval, 0, 10**9)],
             "agent_accounts": {
                 agent_id: self._exchange.get_account_snapshot(self.session_id, agent_id)
                 for agent_id in self._agents
