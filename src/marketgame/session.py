@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 from marketgame.api.market import MarketAPI
-from marketgame.sim.agents.market_maker import MarketMakerAgent
-from marketgame.sim.agents.momentum import MomentumAgent
 from marketgame.sim.agents.runtime import AgentRuntime
-from marketgame.sim.agents.value import ValueAgent
 from marketgame.sim.contracts import CancelOrderRequest, EventSubscription, SubmitOrderRequest
 from marketgame.sim.events import MarketEvent
 from marketgame.sim.exchange.engine import ExchangeEngine
 from marketgame.sim.kernel import SimulationKernel
 from marketgame.sim.market_data.service import InMemoryMarketDataService
+from marketgame.sim.population import build_seeded_population
 from marketgame.sim.replay.store import ReplayStore
 
 
@@ -23,23 +21,22 @@ def run_seeded_session(seed: int, symbol: str, steps: int) -> dict[str, object]:
     runtime = AgentRuntime()
 
     base_mid = 100.0 + kernel.master_rng.randint(0, 2) * 0.5
-    agents = {
-        "market_maker": MarketMakerAgent(
-            agent_id="market_maker",
-            symbol=symbol,
-            spread=2.0,
-            quantity=5,
-        ),
-        "momentum": MomentumAgent(agent_id="momentum", symbol=symbol, quantity=3),
-        "value": ValueAgent(
-            agent_id="value",
-            symbol=symbol,
-            fair_value=base_mid + 1.5,
-            quantity=4,
-        ),
-    }
+    agents, account_configs = build_seeded_population(
+        seed=seed,
+        symbol=symbol,
+        counts={"market_maker": 1, "momentum": 1, "value": 1},
+    )
 
     for agent in agents.values():
+        if hasattr(agent, "fair_value"):
+            agent.fair_value = base_mid + 1.5
+        exchange.configure_account(
+            agent.agent_id,
+            initial_cash=account_configs[agent.agent_id]["initial_cash"],
+            allow_short=True,
+            short_margin_ratio=1.0,
+            allow_margin=False,
+        )
         runtime.register_agent(agent)
         runtime.subscribe(
             EventSubscription(
@@ -128,4 +125,8 @@ def run_seeded_session(seed: int, symbol: str, steps: int) -> dict[str, object]:
         "trades": trades,
         "bars": bars,
         "agent_metrics": agent_metrics,
+        "agent_accounts": {
+            agent_id: exchange.get_account_snapshot(session_id, agent_id)
+            for agent_id in agents
+        },
     }
