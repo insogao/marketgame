@@ -6,7 +6,10 @@ build-backend = "setuptools.build_meta"
 name = "marketgame"
 version = "0.0.0"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
@@ -16,3 +19,6 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+marketgame = ["web/*.html", "web/*.js", "web/*.css"]

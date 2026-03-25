@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Market Game</title>
+    <meta
+      name="description"
+      content="Realtime market viewer for the event-driven market simulator."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/web/styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.1/dist/lightweight-charts.standalone.production.js" defer></script>
+    <script type="module" src="/web/app.js" defer></script>
+  </head>
+  <body>
+    <div class="shell">
+      <header class="hero">
+        <div class="hero__copy">
+          <p class="eyebrow">Realtime Market Viewer</p>
+          <h1>Market Game</h1>
+          <p class="lede">
+            Watch the market tick forward, slow it down, or fast-forward through the tape.
+            The chart, trade stream, and account states all read from the same simulation.
+          </p>
+        </div>
+        <div class="hero__status">
+          <div class="status-card">
+            <span class="status-card__label">Session</span>
+            <strong id="session-status">Idle</strong>
+            <small id="session-details">Waiting for a seeded session to start.</small>
+          </div>
+          <div class="status-card">
+            <span class="status-card__label">Speed</span>
+            <strong id="speed-readout">1.0x</strong>
+            <small id="transport-readout">Live playback is paused.</small>
+          </div>
+        </div>
+      </header>
+
+      <main class="layout">
+        <section class="panel panel--controls">
+          <div class="panel__header">
+            <div>
+              <p class="panel__kicker">Controls</p>
+              <h2>Playback</h2>
+            </div>
+            <span class="panel__badge" id="connection-state">Disconnected</span>
+          </div>
+
+          <div class="control-bar">
+            <label>
+              <span>Seed</span>
+              <input id="seed-input" type="number" min="1" step="1" value="7" />
+            </label>
+            <label>
+              <span>Symbol</span>
+              <input id="symbol-input" type="text" value="FOO" maxlength="16" />
+            </label>
+            <label>
+              <span>Steps</span>
+              <input id="steps-input" type="number" min="1" step="1" value="250" />
+            </label>
+            <label>
+              <span>Speed</span>
+              <select id="speed-select">
+                <option value="0.25">0.25x</option>
+                <option value="0.5">0.5x</option>
+                <option value="1" selected>1.0x</option>
+                <option value="2">2.0x</option>
+                <option value="4">4.0x</option>
+                <option value="10">10.0x</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="button-row">
+            <button data-action="start" class="button button--accent">Start</button>
+            <button data-action="pause" class="button">Pause</button>
+            <button data-action="resume" class="button">Resume</button>
+            <button data-action="reset" class="button">Reset</button>
+          </div>
+        </section>
+
+        <section class="panel panel--chart">
+          <div class="panel__header">
+            <div>
+              <p class="panel__kicker">Chart</p>
+              <h2>K-Line View</h2>
+            </div>
+            <span class="panel__badge" id="chart-symbol">FOO</span>
+          </div>
+          <div id="chart" class="chart"></div>
+        </section>
+
+        <section class="panel panel--summary">
+          <div class="panel__header">
+            <div>
+              <p class="panel__kicker">Market</p>
+              <h2>Latest Snapshot</h2>
+            </div>
+          </div>
+          <div class="summary-grid">
+            <article>
+              <span>Last Trade</span>
+              <strong id="last-trade-price">--</strong>
+              <small id="last-trade-meta">Awaiting trade prints.</small>
+            </article>
+            <article>
+              <span>Best Bid</span>
+              <strong id="best-bid">--</strong>
+              <small id="best-bid-size">Size --</small>
+            </article>
+            <article>
+              <span>Best Ask</span>
+              <strong id="best-ask">--</strong>
+              <small id="best-ask-size">Size --</small>
+            </article>
+            <article>
+              <span>Bars</span>
+              <strong id="bar-count">0</strong>
+              <small id="event-count">0 events processed</small>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel panel--tape">
+          <div class="panel__header">
+            <div>
+              <p class="panel__kicker">Tape</p>
+              <h2>Recent Trades</h2>
+            </div>
+          </div>
+          <div class="tape" id="trade-tape" aria-live="polite"></div>
+        </section>
+
+        <section class="panel panel--accounts">
+          <div class="panel__header">
+            <div>
+              <p class="panel__kicker">Accounts</p>
+              <h2>Agent Balances</h2>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="accounts-table">
+              <thead>
+                <tr>
+                  <th>Agent</th>
+                  <th>Cash</th>
+                  <th>Position</th>
+                  <th>Open Orders</th>
+                </tr>
+              </thead>
+              <tbody id="accounts-body"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
