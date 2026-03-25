@@ -1,10 +1,10 @@
 param(
-    [string]$Host = "127.0.0.1",
+    [string]$BindHost = "127.0.0.1",
     [int]$Port = 8000,
     [switch]$Reload
 )
 
-$args = @("--host", $Host, "--port", $Port)
+$args = @("--host", $BindHost, "--port", $Port)
 if ($Reload) {
     $args += "--reload"
 }
